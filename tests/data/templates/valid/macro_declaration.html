@@ -1,0 +1,12 @@
+{# typja:macro render_user(user: dict, show_email: bool = False) -> str #}
+{% macro render_user(user, show_email=False) %}
+    <div class="user">
+        <p>{{ user.name }}</p>
+        {% if show_email %}
+            <p>{{ user.email }}</p>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{# typja:var current_user: dict #}
+{{ render_user(current_user, True) }}

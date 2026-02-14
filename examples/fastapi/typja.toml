@@ -1,0 +1,84 @@
+# typja configuration file
+# Generated for type-resolver example
+
+# ============================================================================
+# Project Configuration
+# ============================================================================
+[project]
+# Root directory of the project
+root = "."
+
+# Paths where typja looks for type definitions
+# These are searched when resolving imports like User, Product, etc.
+paths = ["./models/**/*.py"]
+
+# Exit code on warnings
+fail_on_warning = false
+
+
+# ============================================================================
+# Jinja Environment Configuration
+# ============================================================================
+[environment]
+# Template directories to scan
+template_dirs = ["./templates"]
+
+# Template file patterns to include
+include_patterns = ["*.html", "*.jinja", "*.jinja2", "*.j2"]
+
+# Template file patterns to exclude
+exclude_patterns = [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+]
+
+
+# ============================================================================
+# Linting Configuration
+# ============================================================================
+[linting]
+# Strict mode: all variables must be typed
+strict = false
+
+# Enforce PEP 604 union syntax (X | Y instead of Union[X, Y])
+prefer_pep604_unions = true
+
+# Union style enforcement level
+union_style = "warning" # "error" | "warning" | "ignore"
+
+# Auto-fix PEP 604 violations
+fix_union_syntax = true
+
+# Warn about unused imports
+warn_unused_imports = true
+
+# Warn about undefined variables
+warn_undefined_variables = true
+
+# Warn about type mismatches
+warn_type_mismatches = true
+
+# Validate that imported types exist in type definitions
+validate_imports = true
+
+# Validate variable usage matches declared types
+validate_variables = true
+
+
+# ============================================================================
+# Error Reporting Configuration
+# ============================================================================
+[errors]
+# Error message verbosity
+verbosity = "normal" # "minimal" | "normal" | "verbose"
+
+# Show code snippets in error messages
+show_snippets = true
+
+# Show hints and suggestions in error messages
+show_hints = true
+
+# Color output in terminal
+color = "auto" # "auto" | "always" | "never"

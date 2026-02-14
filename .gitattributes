@@ -1,0 +1,26 @@
+* text=auto
+
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+
+*.html text eol=lf
+*.jinja text eol=lf
+*.jinja2 text eol=lf
+*.j2 text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pyc binary
+
+# Documentation
+LICENSE diff=text
+*.md diff=text

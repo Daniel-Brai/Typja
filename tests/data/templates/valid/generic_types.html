@@ -1,0 +1,13 @@
+{# typja:from typing import List, Dict, Tuple, Set #} {# typja:var items:
+List[str] #} {# typja:var mapping: Dict[str, int] #} {# typja:var coordinates:
+Tuple[float, float] #} {# typja:var tags: Set[str] #}
+
+<!doctype html>
+<html>
+    <body>
+        <h1>Generic Types Demo</h1>
+        {% for item in items %}
+        <p>{{ item }}</p>
+        {% endfor %}
+    </body>
+</html>

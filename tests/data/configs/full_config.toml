@@ -1,0 +1,34 @@
+[project]
+root = "/custom/root"
+paths = ["./models", "./schemas"]
+fail_on_warning = true
+
+[environment]
+jinja_env = "myapp.jinja_env"
+template_dirs = ["./templates", "./emails"]
+include_patterns = ["*.html", "*.jinja", "*.jinja2", "*.j2"]
+exclude_patterns = ["**/dist/**", "**/build/**", "**/__pycache__/**"]
+
+[linting]
+strict = true
+prefer_pep604_unions = true
+union_style = "error"
+fix_union_syntax = true
+warn_unused_imports = true
+warn_undefined_variables = true
+warn_type_mismatches = true
+validate_imports = true
+validate_filters = true
+validate_macros = true
+validate_variables = true
+check_missing_annotations = true
+
+[formatting]
+enabled = true
+sort_imports = true
+
+[errors]
+verbosity = "verbose"
+show_snippets = true
+show_hints = true
+color = "always"

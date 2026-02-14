@@ -1,0 +1,12 @@
+{# typja:var user: dict #} {# typja:from typing import List #} {# typja:var
+items: List[str] #}
+
+<!doctype html>
+<html>
+    <body>
+        <p>{{ user.name }}</p>
+        {% for item in items %}
+        <span>{{ item }}</span>
+        {% endfor %}
+    </body>
+</html>

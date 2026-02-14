@@ -1,0 +1,6 @@
+[project]
+root = "."
+
+[linting]
+prefer_pep604_unions = false
+union_style = "ignore"

@@ -1,0 +1,6 @@
+- id: typja-check
+  name: typja check
+  description: Run typja template checks
+  entry: typja check
+  language: python
+  pass_filenames: false

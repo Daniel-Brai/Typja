@@ -1,0 +1,18 @@
+{# typja:from typing import List, Dict, Optional #} {# typja:import datetime #}
+{# typja:var users: List[dict] #} {# typja:var count: int #} {# typja:var
+timestamp: Optional[datetime.datetime] #}
+
+<!doctype html>
+<html>
+    <body>
+        <h1>Users ({{ count }})</h1>
+        <ul>
+            {% for user in users %}
+            <li>{{ user.name }}</li>
+            {% endfor %}
+        </ul>
+        {% if timestamp %}
+        <p>Generated: {{ timestamp }}</p>
+        {% endif %}
+    </body>
+</html>

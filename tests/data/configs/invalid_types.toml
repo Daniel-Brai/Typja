@@ -1,0 +1,4 @@
+[project]
+root = 123
+paths = "not a list"
+fail_on_warning = "not a bool"

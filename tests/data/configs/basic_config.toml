@@ -1,0 +1,26 @@
+[project]
+root = "."
+paths = ["./types"]
+fail_on_warning = false
+
+[environment]
+template_dirs = ["./templates"]
+include_patterns = ["*.html", "*.jinja", "*.jinja2"]
+exclude_patterns = ["**/node_modules/**", "**/.git/**"]
+
+[linting]
+strict = false
+prefer_pep604_unions = true
+union_style = "warning"
+warn_unused_imports = true
+warn_undefined_variables = true
+
+[formatting]
+enabled = true
+sort_imports = true
+
+[errors]
+verbosity = "normal"
+show_snippets = true
+show_hints = true
+color = "auto"

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{# typja:var user: User #}
+
+{% block title %}{{ user.name }} - Profile{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+  <header class="profile-header">
+    <div class="profile-info">
+      <h1 class="profile-name">{{ user.name }}</h1>
+      <p class="profile-email">{{ user.email }}</p>
+
+      <div class="profile-status">
+        {% if user.is_active %}
+          <span class="status-badge status-active">Active User</span>
+        {% else %}
+          <span class="status-badge status-inactive">Inactive User</span>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <section class="profile-details">
+    <h2>Profile Information</h2>
+
+    <div class="profile-item">
+      <label>ID:</label>
+      <span>{{ user.id }}</span>
+    </div>
+
+    <div class="profile-item">
+      <label>Name:</label>
+      <span>{{ user.name | title }}</span>
+    </div>
+
+    <div class="profile-item">
+      <label>Email:</label>
+      <span>
+        <a href="mailto:{{ user.email }}">{{ user.email }}</a>
+      </span>
+    </div>
+
+    <div class="profile-item">
+      <label>Display Name:</label>
+      <span>{{ user.get_display_name() }}</span>
+    </div>
+
+    <div class="profile-item">
+      <label>Status:</label>
+      <span>
+        {% if user.is_active %}
+          Active since registration
+        {% else %}
+          Account disabled
+        {% endif %}
+      </span>
+    </div>
+  </section>
+
+  <section class="profile-actions">
+    <h2>Actions</h2>
+    <ul>
+      <li>
+        <a href="/users" class="btn btn-primary">Back to Users</a>
+      </li>
+      <li>
+        <a href="/profile/{{ user.id }}/edit" class="btn btn-secondary">Edit Profile</a>
+      </li>
+    </ul>
+  </section>
+</div>
+
+<style>
+  .profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .profile-header {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 30px;
+    border-left: 4px solid #007bff;
+  }
+
+  .profile-name {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    color: #333;
+  }
+
+  .profile-email {
+    margin: 0;
+    color: #666;
+    font-size: 16px;
+  }
+
+  .profile-status {
+    margin-top: 15px;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .status-active {
+    background-color: #d4edda;
+    color: #155724;
+  }
+
+  .status-inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+
+  .profile-details, .profile-actions, .profile-debug {
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .profile-details h2,
+  .profile-actions h2,
+  .profile-debug h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 20px;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+  }
+
+  .profile-item {
+    display: flex;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .profile-item:last-child {
+    border-bottom: none;
+  }
+
+  .profile-item label {
+    font-weight: bold;
+    width: 120px;
+    color: #555;
+  }
+
+  .profile-item span {
+    flex: 1;
+    color: #333;
+  }
+
+  .profile-item a {
+    color: #007bff;
+    text-decoration: none;
+  }
+
+  .profile-item a:hover {
+    text-decoration: underline;
+  }
+
+  .profile-actions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .profile-actions li {
+    margin-bottom: 10px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary {
+    background-color: #007bff;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: #0056b3;
+  }
+
+  .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background-color: #545b62;
+  }
+
+  .profile-debug pre {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+  }
+
+  .profile-debug code {
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    color: #333;
+  }
+</style>
+{% endblock %}

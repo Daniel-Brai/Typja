@@ -1,0 +1,13 @@
+{# typja:from typing import Union #} {# typja:var value: str | int #} {#
+typja:var optional_name: str | None #} {# typja:var complex: Union[str, int,
+list] #}
+
+<!doctype html>
+<html>
+    <body>
+        <p>Value: {{ value }}</p>
+        {% if optional_name %}
+        <p>Name: {{ optional_name }}</p>
+        {% endif %}
+    </body>
+</html>

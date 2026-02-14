@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Environment variables
+.env
+.env.*.local
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+*logs/
+*.log
+dump.rdb
+
+celerybeat.pid
+celerybeat-*
+
+media/
