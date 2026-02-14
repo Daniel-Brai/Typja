@@ -15,7 +15,6 @@ from typja.parser.type import TypeParser
 
 
 class TestParserAST:
-    """Test AST node classes and their string representations"""
 
     def test_type_annotation_simple(self):
         ta = TypeAnnotation(raw="str", name="str", module=None)
@@ -294,9 +293,42 @@ class TestParserImports:
         with pytest.raises(TypjaParseError):
             parser.parse_from_import("from import List", 1, 0)
 
+    def test_parse_from_import_relative_single_dot(self):
+        parser = ImportParser()
+        stmt = parser.parse_from_import("from .models import User", 1, 0)
+
+        assert isinstance(stmt, FromImportStatement)
+        assert stmt.module == ".models"
+        assert len(stmt.names) == 1
+        assert stmt.names[0] == ("User", None)
+
+    def test_parse_from_import_relative_double_dot(self):
+        parser = ImportParser()
+        stmt = parser.parse_from_import("from ..utils import helper", 1, 0)
+
+        assert stmt.module == "..utils"
+        assert len(stmt.names) == 1
+        assert stmt.names[0] == ("helper", None)
+
+    def test_parse_from_import_relative_with_alias(self):
+        parser = ImportParser()
+        stmt = parser.parse_from_import("from .types import User as U", 1, 0)
+
+        assert stmt.module == ".types"
+        assert len(stmt.names) == 1
+        assert stmt.names[0] == ("User", "U")
+
+    def test_parse_from_import_relative_multiple(self):
+        parser = ImportParser()
+        stmt = parser.parse_from_import("from .models import User, Profile", 1, 0)
+
+        assert stmt.module == ".models"
+        assert len(stmt.names) == 2
+        assert stmt.names[0] == ("User", None)
+        assert stmt.names[1] == ("Profile", None)
+
 
 class TestParserComment:
-    """Test comment parser functionality"""
 
     def test_parse_simple_var(self):
         parser = CommentParser()

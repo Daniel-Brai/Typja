@@ -13,7 +13,8 @@ class ImportParser:
     IMPORT_PATTERN = re.compile(r"^import\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*$")
 
     # For the pattern: "from module import name1, name2 as alias"
-    FROM_IMPORT_PATTERN = re.compile(r"^from\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s+import\s+(.+)$")
+    # Supports relative imports: from .module or from ..module
+    FROM_IMPORT_PATTERN = re.compile(r"^from\s+(\.+[a-zA-Z_][a-zA-Z0-9_.]*|[a-zA-Z_][a-zA-Z0-9_.]*)\s+import\s+(.+)$")
 
     def parse_import(self, text: str, line: int, col: int) -> ImportStatement:
         match = self.IMPORT_PATTERN.match(text.strip())

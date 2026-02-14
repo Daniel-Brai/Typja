@@ -1,3 +1,4 @@
+from typja.parser.ast import TypeAnnotation
 from typja.registry import TypeRegistry
 from typja.resolver import TypeResolver
 
@@ -586,3 +587,93 @@ class TestTypeResolver:
 
         attr_type = resolver.get_attribute_type("Status", "ACTIVE")
         assert attr_type is not None
+
+    def test_resolve_init_imports(self, tmp_path):
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+
+        user_file = models_dir / "user.py"
+        user_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+
+class Profile:
+    bio: str
+    user_id: int
+"""
+        )
+
+        init_file = models_dir / "__init__.py"
+        init_file.write_text("from .user import User, Profile\n")
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([models_dir])
+
+        assert "User" in resolver.resolved_types
+        assert "Profile" in resolver.resolved_types
+
+        assert "models.user.User" in resolver.resolved_types
+        assert "models.User" in resolver.resolved_types
+
+        models_user = resolver.resolved_types["models.User"]
+        assert models_user.module_path == "models"
+        assert models_user.name == "User"
+
+    def test_resolve_init_imports_in_registry(self, tmp_path):
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+
+        user_file = models_dir / "user.py"
+        user_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        init_file = models_dir / "__init__.py"
+        init_file.write_text("from .user import User\n")
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([models_dir])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        registry.import_from_module("models", [("User", None)])
+
+        assert "User" in registry._imported_names
+
+    def test_auto_import_from_top_level_module(self, tmp_path):
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+
+        user_file = models_dir / "user.py"
+        user_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        init_file = models_dir / "__init__.py"
+        init_file.write_text("from .user import User\n")
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([models_dir])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        user_annotation = TypeAnnotation(raw="User", name="User")
+
+        assert "User" in registry._imported_names
+        assert registry._imported_names["User"] is not None
+        assert registry._imported_names["User"].name == "User"
+
+        resolved = registry.resolve_type(user_annotation)
+        assert resolved is not None or "User" in registry._imported_names

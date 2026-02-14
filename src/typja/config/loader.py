@@ -85,7 +85,7 @@ class ConfigLoader:
 
         raise TypjaConfigError(
             f"typja.toml not found in {start_dir} or any parent directory.\n"
-            "Hint: Run 'typja init' to create a configuration file."
+            "\nHint: Run 'typja init' to create a configuration file."
         )
 
     @staticmethod

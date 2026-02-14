@@ -1,4 +1,4 @@
-name: Build, Test and Publish Typja
+name: Build and Test Typja
 
 env:
     PYTHONUNBUFFERED: 1

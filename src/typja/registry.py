@@ -63,6 +63,7 @@ class TypeRegistry:
         self._types: dict[str, TypeDefinition] = {}
         self._modules: dict[str, dict[str, TypeDefinition]] = {}
         self._imported_names: dict[str, TypeDefinition] = {}
+        self._auto_imported_names: dict[str, TypeDefinition] = {}
         self._imported_modules: set[str] = set()
         self._builtins = PYTHON_BUILTINS
         self._typing_types = TYPING_TYPES
@@ -150,14 +151,14 @@ class TypeRegistry:
             raise TypjaValidationError(
                 f"'{type_annotation.name}' is not defined. "
                 f"Did you mean to import it from typing?\n"
-                f"Hint: {{# typja:from typing import {type_annotation.name} #}}"
+                f"\nHint: {{# typja:from typing import {type_annotation.name} #}}"
             )
 
         if type_annotation.module:
             if type_annotation.module not in self._imported_modules:
                 raise TypjaValidationError(
                     f"Module '{type_annotation.module}' is not imported.\n"
-                    f"Hint: {{# typja:import {type_annotation.module} #}}"
+                    f"\nHint: {{# typja:import {type_annotation.module} #}}"
                 )
 
             if type_annotation.module not in self._modules:
@@ -174,7 +175,7 @@ class TypeRegistry:
 
         raise TypjaValidationError(
             f"'{type_annotation.name}' is not defined.\n"
-            f"Hint: Import it with {{# typja:from <module> import {type_annotation.name} #}}"
+            f"\nHint: Import it with {{# typja:from <module> import {type_annotation.name} #}}"
         )
 
     def get_type(self, name: str) -> TypeDefinition | None:
@@ -189,3 +190,4 @@ class TypeRegistry:
     def clear_imports(self) -> None:
         self._imported_names.clear()
         self._imported_modules.clear()
+        self._imported_names.update(self._auto_imported_names)

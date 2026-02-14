@@ -10,7 +10,7 @@ root = "."
 
 # Paths where typja looks for type definitions
 # These are searched when resolving imports like User, Product, etc.
-paths = ["./models/**/*.py"]
+paths = ["./models"]
 
 # Exit code on warnings
 fail_on_warning = false

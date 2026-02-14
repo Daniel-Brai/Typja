@@ -50,17 +50,21 @@ class TypeResolver:
         """
 
         self.resolved_types = {}
+        init_files: list[tuple[Path, ast.AST, str]] = []
 
         for path in paths:
             if not path.exists():
                 continue
 
             if path.is_file() and path.suffix == ".py":
-                self._resolve_file(path)
+                self._resolve_file(path, collect_init=True, init_files=init_files)
             elif path.is_dir():
                 for py_file in path.rglob("*.py"):
                     if not self._should_skip_file(py_file):
-                        self._resolve_file(py_file)
+                        self._resolve_file(py_file, collect_init=True, init_files=init_files)
+
+        for init_file, tree, module_path in init_files:
+            self._process_init_imports(tree, module_path, init_file)
 
         return self.resolved_types
 
@@ -83,12 +87,19 @@ class TypeResolver:
 
         return False
 
-    def _resolve_file(self, file_path: Path) -> None:
+    def _resolve_file(
+        self,
+        file_path: Path,
+        collect_init: bool = False,
+        init_files: list[tuple[Path, ast.AST, str]] | None = None,
+    ) -> None:
         """
         Extract type definitions from a single Python file
 
         Args:
             file_path (Path): Path to the Python file
+            collect_init (bool): Whether to collect __init__.py files for later processing
+            init_files (list): List to collect (file_path, tree, module_path) tuples for __init__.py files
         """
 
         try:
@@ -112,8 +123,80 @@ class TypeResolver:
                             qualified_name = f"{module_path}.{resolved.name}"
                             self.resolved_types[qualified_name] = resolved
 
+            # If this is __init__.py and we're collecting, save it for second pass
+            if relative.name == "__init__.py" and module_path and collect_init and init_files is not None:
+                init_files.append((file_path, tree, module_path))
+
+            # If we're not in collect mode and this is __init__.py, process imports immediately
+            elif relative.name == "__init__.py" and module_path and not collect_init:
+                self._process_init_imports(tree, module_path, file_path)
+
         except Exception:
             return
+
+    def _process_init_imports(self, tree: ast.AST, module_path: str, init_file: Path) -> None:
+        """
+        Process imports in __init__.py to make imported types available at the module level
+
+        Args:
+            tree (ast.AST): The parsed AST of __init__.py
+            module_path (str): The module path (e.g., 'models')
+            init_file (Path): Path to the __init__.py file
+        """
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module is None:
+                    continue
+
+                if node.level > 0:
+                    if node.module:
+                        imported_module = f"{module_path}.{node.module}"
+                    else:
+                        imported_module = module_path
+                else:
+                    imported_module = node.module
+
+                for alias in node.names:
+                    if alias.name == "*":
+                        for key, resolved in list(self.resolved_types.items()):
+                            if resolved.module_path == imported_module:
+                                if "." not in key:
+                                    new_resolved = ResolvedType(
+                                        name=resolved.name,
+                                        module_path=module_path,
+                                        file_path=resolved.file_path,
+                                        fields=resolved.fields,
+                                        methods=resolved.methods,
+                                        bases=resolved.bases,
+                                    )
+                                    module_level_key = f"{module_path}.{key}"
+                                    if module_level_key not in self.resolved_types:
+                                        self.resolved_types[module_level_key] = new_resolved
+                                        if key not in self.resolved_types:
+                                            self.resolved_types[key] = new_resolved
+                    else:
+                        imported_name = alias.name
+                        qualified_imported = f"{imported_module}.{imported_name}"
+
+                        resolved = None
+                        if qualified_imported in self.resolved_types:
+                            resolved = self.resolved_types[qualified_imported]
+                        elif imported_name in self.resolved_types:
+                            resolved = self.resolved_types[imported_name]
+
+                        if resolved:
+                            new_resolved = ResolvedType(
+                                name=resolved.name,
+                                module_path=module_path,
+                                file_path=resolved.file_path,
+                                fields=resolved.fields,
+                                methods=resolved.methods,
+                                bases=resolved.bases,
+                            )
+                            module_level_key = f"{module_path}.{imported_name}"
+                            if module_level_key not in self.resolved_types:
+                                self.resolved_types[module_level_key] = new_resolved
 
     def _extract_class_definition(self, node: ast.ClassDef, module_path: str, file_path: Path) -> ResolvedType | None:
         """
@@ -235,6 +318,8 @@ class TypeResolver:
             registry (TypeRegistry): The registry to populate
         """
 
+        top_level_modules: dict[str, dict[str, TypeDefinition]] = {}
+
         for _, resolved in self.resolved_types.items():
             type_def = TypeDefinition(
                 name=resolved.name,
@@ -244,6 +329,17 @@ class TypeResolver:
             )
 
             registry.register_type(type_def)
+
+            if resolved.module_path and "." not in resolved.module_path:
+                if resolved.module_path not in top_level_modules:
+                    top_level_modules[resolved.module_path] = {}
+
+                top_level_modules[resolved.module_path][resolved.name] = type_def
+
+        for _, types in top_level_modules.items():
+            for type_name, type_def in types.items():
+                registry._imported_names[type_name] = type_def
+                registry._auto_imported_names[type_name] = type_def
 
     def validate_type_exists(self, type_name: str) -> bool:
         """

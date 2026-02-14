@@ -198,9 +198,6 @@ def check(
         if warnings > 0 and config.project.fail_on_warning:
             raise typer.Exit(1)
 
-        if len(all_issues) == 0:
-            console.print("[green]✓ No issues found[/green]")
-
         raise typer.Exit(0)
 
     except typer.Exit:
