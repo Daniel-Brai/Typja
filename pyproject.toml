@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "typja"
-version = "0.1.0"
+version = "0.1.1"
 description = "Type checker for your Jinja2 templates"
 readme = "README.md"
 license = { text = "MIT" }
