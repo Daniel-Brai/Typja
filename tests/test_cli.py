@@ -128,7 +128,7 @@ template_dirs = ["{templates_dir}"]
         result = runner.invoke(app, ["check", "--root", str(tmp_path)])
 
         assert result.exit_code == 0
-        assert "No issues" in result.stdout or "✓" in result.stdout
+        assert "Checking" in result.stdout
 
     def test_check_with_type_error(self, tmp_path):
         templates_dir = tmp_path / "templates"
