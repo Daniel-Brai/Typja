@@ -1,7 +1,7 @@
 # Typja
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![Build and Test Typja](https://github.com/Daniel-Brai/SQLNotify/actions/workflows/ci.yml/badge.svg)](https://github.com/Daniel-Brai/Typja/actions/workflows/ci.yml)
+[![Build and Test Typja](https://github.com/Daniel-Brai/Typja/actions/workflows/ci.yml/badge.svg)](https://github.com/Daniel-Brai/Typja/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Daniel-Brai/Typja/branch/main/graph/badge.svg)](https://codecov.io/gh/Daniel-Brai/Typja)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
