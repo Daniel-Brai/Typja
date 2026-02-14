@@ -2,7 +2,7 @@ from jinja2 import Environment
 
 from typja.analyzer import TemplateAnalyzer, ValidationIssue
 from typja.registry import TypeDefinition, TypeRegistry
-from typja.resolver import TypeResolver
+from typja.resolver import ResolvedType, TypeResolver
 
 
 class TestValidationIssue:
@@ -361,9 +361,87 @@ class TestTemplateAnalyzer:
         issues1 = analyzer.analyze_template(template1, "template1.html")
         issues2 = analyzer.analyze_template(template2, "template2.html")
 
-        # Each analysis should return a new list
         assert isinstance(issues1, list)
         assert isinstance(issues2, list)
-        # Verify they're analyzed independently
         assert len(issues1) >= 0
         assert len(issues2) >= 0
+
+    def test_loop_variable_attribute_validation(self, tmp_path):
+        registry = TypeRegistry()
+        user_type = TypeDefinition(
+            name="User",
+            fields={"id": "int", "name": "str", "email": "str"},
+            module="models",
+        )
+        registry.register_module_types("models", {"User": user_type})
+
+        resolver = TypeResolver(tmp_path, exclude_patterns=[])
+        resolver.resolved_types = {
+            "User": ResolvedType(
+                name="User",
+                module_path="models",
+                file_path=tmp_path / "models.py",
+                fields={"id": "int", "name": "str", "email": "str"},
+                methods={},
+                bases=[],
+            )
+        }
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+
+        template = """
+{# typja:from typing import List #}
+{# typja:from models import User #}
+{# typja:var users: List[User] #}
+{% for u in users %}
+    <p>{{ u.name }}</p>
+    <p>{{ u.dog }}</p>
+{% endfor %}
+"""
+
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [i for i in issues if i.severity == "error"]
+        dog_errors = [e for e in errors if "dog" in e.message.lower()]
+
+        assert len(dog_errors) == 1
+
+    def test_loop_variable_valid_attributes(self, tmp_path):
+
+        registry = TypeRegistry()
+        user_type = TypeDefinition(
+            name="User",
+            fields={"id": "int", "name": "str", "email": "str"},
+            module="models",
+        )
+        registry.register_module_types("models", {"User": user_type})
+
+        resolver = TypeResolver(tmp_path, exclude_patterns=[])
+        resolver.resolved_types = {
+            "User": ResolvedType(
+                name="User",
+                module_path="models",
+                file_path=tmp_path / "models.py",
+                fields={"id": "int", "name": "str", "email": "str"},
+                methods={},
+                bases=[],
+            )
+        }
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+
+        template = """
+{# typja:from typing import List #}
+{# typja:from models import User #}
+{# typja:var users: List[User] #}
+{% for u in users %}
+    <p>{{ u.name }}</p>
+    <p>{{ u.email }}</p>
+{% endfor %}
+"""
+
+        issues = analyzer.analyze_template(template, "test.html")
+        errors = [i for i in issues if i.severity == "error"]
+
+        assert len(errors) == 0
+        assert len(errors) == 0

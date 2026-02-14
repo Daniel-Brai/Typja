@@ -276,7 +276,7 @@ class ValidationVisitor(NodeVisitor):
     def __init__(self, analyzer: TemplateAnalyzer, filename: str):
         self.analyzer = analyzer
         self.filename = filename
-        self.loop_vars: set[str] = set()
+        self.loop_vars: dict[str, TypeAnnotation] = {}
 
     def visit_Name(self, node: nodes.Name) -> None:
         # skip checks for lines marked with `{# typja: ignore #}`
@@ -343,11 +343,15 @@ class ValidationVisitor(NodeVisitor):
 
         if isinstance(node.node, nodes.Name) and node.node.ctx == "load":
             var_name = node.node.name
+            type_annotation: TypeAnnotation | None = None
 
             if var_name in self.analyzer.variables:
                 var_decl = self.analyzer.variables[var_name]
                 type_annotation = var_decl.type_annotation
+            elif var_name in self.loop_vars:
+                type_annotation = self.loop_vars[var_name]
 
+            if type_annotation:
                 base_type_name = self._get_base_type_name(type_annotation)
 
                 if base_type_name and self.analyzer.resolver:
@@ -410,14 +414,31 @@ class ValidationVisitor(NodeVisitor):
         self.generic_visit(node)
 
     def visit_For(self, node: nodes.For) -> None:
+        loop_var_name = None
+        loop_var_type = None
+
+        # Extract the loop variable name
         if isinstance(node.target, nodes.Name):
-            self.loop_vars.add(node.target.name)
+            loop_var_name = node.target.name
+
+            if isinstance(node.iter, nodes.Name):
+                iterable_name = node.iter.name
+
+                if iterable_name in self.analyzer.variables:
+                    var_decl = self.analyzer.variables[iterable_name]
+                    iterable_type = var_decl.type_annotation
+
+                    if iterable_type.args and len(iterable_type.args) > 0:
+                        loop_var_type = iterable_type.args[0]
+
+            if loop_var_type:
+                self.loop_vars[loop_var_name] = loop_var_type
 
         for child in node.body:
             self.visit(child)
 
-        if isinstance(node.target, nodes.Name):
-            self.loop_vars.discard(node.target.name)
+        if loop_var_name and loop_var_name in self.loop_vars:
+            del self.loop_vars[loop_var_name]
 
         if node.else_:
             for child in node.else_:
