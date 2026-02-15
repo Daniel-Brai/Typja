@@ -59,6 +59,33 @@ Reference your Python classes:
 {# typja:var author: User | None #}
 ```
 
+### Handling Type Conflicts
+
+When the same type name exists in multiple modules, Typja will report an ambiguous type error. You can resolve this in two ways:
+
+#### Using Qualified Names
+
+Use the full module path to specify which type you mean:
+
+```jinja2
+{# typja:var admin_user: admin.User #}
+{# typja:var customer_user: customer.User #}
+{# typja:var blog_post: blog.Post #}
+```
+
+#### Using Explicit Imports
+
+Import the specific type you want to use:
+
+```jinja2
+{# typja:from user import User #}
+{# typja:from admin import Role #}
+{# typja:var current_user: User #}
+{# typja:var user_role: Role #}
+```
+
+The imported type will take precedence over conflicting types from other modules.
+
 ### Union Types
 
 Use the pipe operator for union types (PEP 604):
@@ -76,6 +103,41 @@ Use `Optional` or the `| None` syntax:
 ```jinja2
 {# typja:var description: Optional[str] #}
 {# typja:var user: User | None #}
+```
+
+## Imports
+
+### Importing Modules
+
+Import entire modules to access their types:
+
+```jinja2
+{# typja:import models #}
+{# typja:var user: models.User #}
+{# typja:var post: models.Post #}
+```
+
+### Importing Specific Types
+
+Import specific types from modules:
+
+```jinja2
+{# typja:from models import User, Post #}
+{# typja:from typing import Optional, List #}
+{# typja:var user: User #}
+{# typja:var posts: List[Post] #}
+{# typja:var description: Optional[str] #}
+```
+
+### Import with Aliases
+
+Import types with different names:
+
+```jinja2
+{# typja:from models import User as ModelUser #}
+{# typja:from admin import User as AdminUser #}
+{# typja:var customer: ModelUser #}
+{# typja:var administrator: AdminUser #}
 ```
 
 ## Variable Usage

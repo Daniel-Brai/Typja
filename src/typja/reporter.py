@@ -3,8 +3,6 @@ from pathlib import Path
 from typing import TextIO
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.table import Table
 from rich.theme import Theme
 
@@ -117,6 +115,8 @@ class Reporter:
                 f"{issue.message}"
             )
 
+            self._show_error_line_with_squiggles(issue)
+
             if self.config.show_hints and issue.hint:
                 self.console.print(f"    [hint]💡 {issue.hint}[/hint]")
 
@@ -137,7 +137,7 @@ class Reporter:
 
     def _show_code_snippet(self, issue: ValidationIssue) -> None:
         """
-        Show code snippet around the issue location
+        Show code snippet around the issue location with squiggly lines under problematic text
 
         Args:
             issue (ValidationIssue): Validation issue
@@ -151,35 +151,57 @@ class Reporter:
             content = file_path.read_text()
             lines = content.splitlines()
 
-            start_line = max(0, issue.line - 4)
-            end_line = min(len(lines), issue.line + 3)
+            if issue.line <= 0 or issue.line > len(lines):
+                return
 
-            snippet_lines = lines[start_line:end_line]
-            snippet = "\n".join(snippet_lines)
+            error_line = lines[issue.line - 1]
 
-            syntax = Syntax(
-                snippet,
-                "jinja2",
-                theme="monokai",
-                line_numbers=True,
-                start_line=start_line + 1,
-                highlight_lines={issue.line},
-            )
+            self.console.print(f"    {error_line}")
 
-            self.console.print(
-                Panel(
-                    syntax,
-                    border_style="dim",
-                    padding=(0, 1),
-                )
-            )
+            if issue.col and issue.end_col:
+                spaces = " " * (4 + issue.col)
+                squiggles = "~" * max(1, issue.end_col - issue.col)
+                squiggly_line = f"{spaces}[error]{squiggles}[/error]"
+                self.console.print(squiggly_line)
+
+        except Exception:
+            return
+
+    def _show_error_line_with_squiggles(self, issue: ValidationIssue) -> None:
+        """
+        Show the error line with squiggly lines under the problematic text
+
+        Args:
+            issue (ValidationIssue): Validation issue
+        """
+
+        try:
+            file_path = Path(issue.filename)
+            if not file_path.exists():
+                return
+
+            content = file_path.read_text()
+            lines = content.splitlines()
+
+            if issue.line <= 0 or issue.line > len(lines):
+                return
+
+            error_line = lines[issue.line - 1]
+
+            self.console.print(f"    {error_line}")
+
+            if issue.col is not None and issue.end_col is not None:
+                spaces = " " * (4 + issue.col)
+                squiggles = "~" * max(1, issue.end_col - issue.col)
+                squiggly_line = f"{spaces}[error]{squiggles}[/error]\n"
+                self.console.print(squiggly_line)
 
         except Exception:
             return
 
     def report_summary(self, total_files: int, total_issues: int, errors: int, warnings: int) -> None:
         """
-        Report summary statistics.
+        Report summary statistics
 
         Args:
             total_files (int): Total number of files checked

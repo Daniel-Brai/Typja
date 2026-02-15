@@ -207,10 +207,8 @@ pytest -x
 
 ```python
 class TestFeatureName:
-    """Tests for feature description"""
 
     def test_basic_functionality(self):
-        """Test basic use case"""
         # Arrange
         input_data = ...
 
@@ -221,7 +219,6 @@ class TestFeatureName:
         assert result == expected_output
 
     def test_edge_case(self):
-        """Test edge case handling"""
         # Test implementation
 ```
 
@@ -243,15 +240,15 @@ def process_template(
     strict: bool = False
 ) -> list[ValidationIssue]:
     """
-    Process a template and return validation issues.
+    Process a template and return validation issues
 
     Args:
-        content: Template content as string
-        template_path: Path to the template file
-        strict: Whether to enable strict mode
+        content (str): Template content as string
+        template_path (Path): Path to the template file
+        strict (bool): Whether to enable strict mode (defaults to False)
 
     Returns:
-        List of validation issues found
+        List[ValidationIssue]: List of validation issues found
     """
     ...
 ```
@@ -263,14 +260,9 @@ Use Google-style docstrings:
 ```python
 class TypeRegistry:
     """
-    Registry for managing type definitions and imports.
+    Registry for managing type definitions and imports
 
-    This class maintains a mapping of type names to their definitions
-    and handles import resolution for templates.
-
-    Attributes:
-        _types: Dictionary mapping type names to definitions
-        _modules: Dictionary mapping module names to their types
+    This class maintains a mapping of type names to their definitions and handles import resolution for templates
     """
 ```
 

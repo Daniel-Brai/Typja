@@ -92,7 +92,7 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/Daniel-Brai/Typja
-    rev: v0.1.0
+    rev: v0.1.3
     hooks:
       - id: typja-check
         # With args

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import pytest
 
+import pytest
 
 @pytest.fixture
 def test_data_dir():

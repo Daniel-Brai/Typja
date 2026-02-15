@@ -28,7 +28,7 @@ release: build
 
 test:
 	@echo "Running all tests for typja..."
-	@$(UV) run pytest
+	@$(UV) run pytest $(TEST_ARGS)
 	@echo "All tests completed"
 
 

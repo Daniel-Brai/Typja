@@ -113,12 +113,12 @@ class TestTemplateAnalyzer:
 """
 
         issues = analyzer.analyze_template(template, "test.html")
-
         errors = [i for i in issues if i.severity == "error"]
+
         assert len(errors) == 0
 
     def test_analyze_template_invalid_attribute(self):
-        """Test analyzing template with invalid attribute access"""
+
         registry = TypeRegistry()
         user_type = TypeDefinition(
             name="User", fields={"id": "int", "name": "str"}, module="models"
@@ -134,9 +134,8 @@ class TestTemplateAnalyzer:
 """
 
         issues = analyzer.analyze_template(template, "test.html")
-
-        # Should not have errors for valid attribute
         errors = [i for i in issues if i.severity == "error"]
+
         assert len(errors) == 0
 
     def test_analyze_template_syntax_error(self):
@@ -352,6 +351,7 @@ class TestTemplateAnalyzer:
         assert len(errors) == 0
 
     def test_clear_issues_between_templates(self):
+
         registry = TypeRegistry()
         analyzer = TemplateAnalyzer(registry)
 
@@ -367,6 +367,7 @@ class TestTemplateAnalyzer:
         assert len(issues2) >= 0
 
     def test_loop_variable_attribute_validation(self, tmp_path):
+
         registry = TypeRegistry()
         user_type = TypeDefinition(
             name="User",
@@ -444,4 +445,451 @@ class TestTemplateAnalyzer:
         errors = [i for i in issues if i.severity == "error"]
 
         assert len(errors) == 0
+        assert len(errors) == 0
+
+    def test_nested_attribute_is_valid(self, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class Profile:
+    id: int
+    bio: str
+
+class User:
+    id: int
+    name: str
+    profile: Profile
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user.profile.bio }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [i for i in issues if i.severity == "error"]
+        assert len(errors) == 0
+
+    def test_nested_attribute_is_invalid(self, test_data_dir, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class Profile:
+    id: int
+    bio: str
+
+class User:
+    id: int
+    name: str
+    profile: Profile
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user.profile.dog }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [
+            i for i in issues if i.severity == "error" and "dog" in i.message.lower()
+        ]
+        assert len(errors) == 1
+
+    def test_nested_attribute_in_loop(self, test_data_dir, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class Profile:
+    id: int
+    bio: str
+
+class User:
+    id: int
+    name: str
+    profile: Profile
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var users: list[User] #}
+{% for u in users %}
+    <p>{{ u.profile.dog }}</p>
+{% endfor %}
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [
+            i for i in issues if i.severity == "error" and "dog" in i.message.lower()
+        ]
+
+        assert len(errors) == 1
+
+    def test_deeply_nested_attributes(self, test_data_dir, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class Address:
+    street: str
+    city: str
+
+class Profile:
+    id: int
+    address: Address
+
+class User:
+    id: int
+    profile: Profile
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template_valid = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user.profile.address.city }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template_valid, "test.html")
+        errors = [i for i in issues if i.severity == "error"]
+
+        assert len(errors) == 0
+
+        template_invalid = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user.profile.address.zipcode }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template_invalid, "test.html")
+        errors = [
+            i
+            for i in issues
+            if i.severity == "error" and "zipcode" in i.message.lower()
+        ]
+
+        assert len(errors) == 1
+
+    def test_list_indexing_is_valid(self, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var users: list[User] #}
+<p>{{ users[0].name }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [i for i in issues if i.severity == "error"]
+
+        assert len(errors) == 0
+
+    def test_list_indexing_invalid_attribute(self, test_data_dir, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var users: list[User] #}
+<p>{{ users[0].dog }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [
+            i for i in issues if i.severity == "error" and "dog" in i.message.lower()
+        ]
+       
+        assert len(errors) == 1
+
+    def test_dict_style_access_is_valid(self, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user['name'] }}</p>
+<p>{{ user["id"] }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [i for i in issues if i.severity == "error"]
+
+        assert len(errors) == 0
+
+    def test_dict_style_access_is_invalid(self, test_data_dir, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class User:
+    id: int
+    name: str
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template = """{# typja:from types import User #}
+{# typja:var user: User #}
+<p>{{ user['nonexistent'] }}</p>
+<p>{{ user["nonexistentagain"] }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template, "test.html")
+
+        errors = [
+            i
+            for i in issues
+            if i.severity == "error" and "nonexistent" in i.message.lower()
+        ]
+        assert len(errors) == 2
+
+    def test_combined_indexing_and_nested_attributes(self, tmp_path):
+
+        types_file = tmp_path / "types.py"
+        types_file.write_text(
+            """
+class Profile:
+    id: int
+    bio: str
+
+class User:
+    id: int
+    name: str
+    profile: Profile
+"""
+        )
+
+        resolver = TypeResolver(tmp_path)
+        resolver.resolve_paths([types_file])
+
+        registry = TypeRegistry()
+        resolver.populate_registry(registry)
+
+        template_valid = """{# typja:from types import User #}
+{# typja:var users: list[User] #}
+<p>{{ users[0].profile.bio }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template_valid, "test.html")
+        errors = [i for i in issues if i.severity == "error"]
+
+        assert len(errors) == 0
+
+        template_invalid = """{# typja:from types import User #}
+{# typja:var users: list[User] #}
+<p>{{ users[0].profile.dog }}</p>
+"""
+
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        issues = analyzer.analyze_template(template_invalid, "test.html")
+        errors = [
+            i for i in issues if i.severity == "error" and "dog" in i.message.lower()
+        ]
+       
+        assert len(errors) == 1
+
+    def test_type_conflict_detection(self, test_data_dir):
+        
+        registry = TypeRegistry()
+        resolver = TypeResolver(test_data_dir, exclude_patterns=[])
+        
+        type_paths = [test_data_dir / "types"]
+        resolver.resolve_paths(type_paths)
+        resolver.populate_registry(registry)
+        
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        
+        content = """
+{# typja:var user: User #}
+<h1>{{ user.name }}</h1>
+        """
+        
+        issues = analyzer.analyze_template(content, "test.html")
+        
+        assert len(issues) > 0
+        error_issue = next((issue for issue in issues if issue.severity == "error"), None)
+
+        assert error_issue is not None
+        assert "Ambiguous type 'User'" in error_issue.message
+        assert error_issue.hint is not None
+        assert "user.User" in error_issue.hint 
+        assert "other_user.User" in error_issue.hint
+
+    def test_qualified_type_resolution(self, test_data_dir):
+        
+        registry = TypeRegistry()
+        resolver = TypeResolver(test_data_dir, exclude_patterns=[])
+        
+        type_paths = [test_data_dir / "types"]
+        resolver.resolve_paths(type_paths)
+        resolver.populate_registry(registry)
+        
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        
+        content = """
+{# typja:var main_user: user.User #}
+{# typja:var alt_user: other_user.User #}
+<h1>{{ main_user.name }}</h1>
+<p>{{ alt_user.full_name }}</p>
+        """
+        
+        issues = analyzer.analyze_template(content, "test.html")
+        
+        errors = [issue for issue in issues if issue.severity == "error"]
+        assert len(errors) == 0
+
+    def test_explicit_import_resolves_conflict(self, test_data_dir):
+        
+        registry = TypeRegistry()
+        resolver = TypeResolver(test_data_dir, exclude_patterns=[])
+        
+        type_paths = [test_data_dir / "types"]
+        resolver.resolve_paths(type_paths)
+        resolver.populate_registry(registry)
+        
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        
+        content = """
+{# typja:from user import User #}
+{# typja:var user: User #}
+<h1>{{ user.name }}</h1>
+        """
+        
+        issues = analyzer.analyze_template(content, "test.html")
+        
+        errors = [issue for issue in issues if issue.severity == "error"]
+        assert len(errors) == 0
+
+    def test_qualified_attribute_validation(self, test_data_dir):
+        
+        registry = TypeRegistry()
+        resolver = TypeResolver(test_data_dir, exclude_patterns=[])
+        
+        type_paths = [test_data_dir / "types"]
+        resolver.resolve_paths(type_paths)
+        resolver.populate_registry(registry)
+        
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        
+        content = """
+{# typja:var main_user: user.User #}
+{# typja:var alt_user: other_user.User #}
+<h1>{{ main_user.name }}</h1>
+<p>{{ alt_user.full_name }}</p>
+<p>{{ main_user.invalid_attr }}</p>
+        """
+        
+        issues = analyzer.analyze_template(content, "test.html")
+        
+        errors = [issue for issue in issues if issue.severity == "error"]
+        assert len(errors) == 1
+        assert "has no attribute 'invalid_attr'" in errors[0].message
+
+    def test_generic_types_with_qualified_names(self, test_data_dir):
+        
+        registry = TypeRegistry()
+        resolver = TypeResolver(test_data_dir, exclude_patterns=[])
+        
+        type_paths = [test_data_dir / "types"]
+        resolver.resolve_paths(type_paths)
+        resolver.populate_registry(registry)
+        
+        analyzer = TemplateAnalyzer(registry, resolver=resolver)
+        
+        content = """
+{# typja:var users: list[user.User] #}
+{# typja:var alt_users: list[other_user.User] #}
+{% for user in users %}
+  <p>{{ user.name }}</p>
+{% endfor %}
+        """
+        
+        issues = analyzer.analyze_template(content, "test.html")
+        
+        errors = [issue for issue in issues if issue.severity == "error"]
         assert len(errors) == 0

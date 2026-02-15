@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from jinja2 import Environment, nodes
-from jinja2.exceptions import TemplateSyntaxError
+from jinja2.exceptions import TemplateError
 from jinja2.visitor import NodeVisitor
 
 from typja.constants import PYTHON_BUILTINS, TYPING_TYPES
@@ -32,6 +32,7 @@ class ValidationIssue:
         filename (str): The name of the file where the issue was found
         line (int): The line number where the issue was found
         col (int): The column number where the issue was found (default is 0)
+        end_col (int | None): The end column number for the problematic text (default is None)
         hint (str | None): An optional hint to help fix the issue (default is None)
     """
 
@@ -40,6 +41,7 @@ class ValidationIssue:
     filename: str
     line: int
     col: int = 0
+    end_col: int | None = None
     hint: str | None = None
 
     def __str__(self) -> str:
@@ -78,10 +80,12 @@ class TemplateAnalyzer:
         self.macros: dict[str, MacroDeclaration] = {}
         self.ignored_lines: set[int] = set()
         self.issues: list[ValidationIssue] = []
+        self._content_lines: list[str] = []
 
     def analyze_template(self, content: str, filename: str = "<unknown>") -> list[ValidationIssue]:
 
         self.registry.clear_imports()
+        self._content_lines = content.splitlines()
 
         try:
             comments = self.comment_parser.parse_template(content, filename)
@@ -92,13 +96,13 @@ class TemplateAnalyzer:
             try:
                 ast = self.jinja_env.parse(content, filename=filename)
                 self._validate_ast(ast, filename)
-            except TemplateSyntaxError as e:
+            except TemplateError as e:
                 self.issues.append(
                     ValidationIssue(
                         severity="error",
                         message=f"Jinja2 syntax error: {e.message}",
                         filename=filename,
-                        line=e.lineno or 0,
+                        line=getattr(e, "lineno", 0),
                     )
                 )
 
@@ -122,9 +126,6 @@ class TemplateAnalyzer:
             return
 
         for decl in comment.declarations:
-            if self.resolver and isinstance(decl, VariableDeclaration):
-                self._validate_type_declaration(decl, filename)
-
             if isinstance(decl, ImportStatement):
                 self.registry.import_module(decl.module)
 
@@ -132,18 +133,21 @@ class TemplateAnalyzer:
                 self.registry.import_from_module(decl.module, decl.names)
 
             elif isinstance(decl, VariableDeclaration):
-                try:
-                    self.registry.resolve_type(decl.type_annotation)
-                except TypjaValidationError as e:
-                    self.issues.append(
-                        ValidationIssue(
-                            severity="error",
-                            message=str(e),
-                            filename=filename,
-                            line=decl.line,
-                            col=decl.col,
+                if self.resolver:
+                    self._validate_type_declaration(decl, filename)
+                else:
+                    try:
+                        self.registry.resolve_type(decl.type_annotation)
+                    except TypjaValidationError as e:
+                        self.issues.append(
+                            ValidationIssue(
+                                severity="error",
+                                message=str(e),
+                                filename=filename,
+                                line=decl.line,
+                                col=decl.col,
+                            )
                         )
-                    )
 
                 self.variables[decl.name] = decl
 
@@ -204,6 +208,7 @@ class TemplateAnalyzer:
         filename: str,
         line: int,
         col: int = 0,
+        end_col: int | None = None,
         hint: str | None = None,
     ) -> None:
 
@@ -214,6 +219,7 @@ class TemplateAnalyzer:
                 filename=filename,
                 line=line,
                 col=col,
+                end_col=end_col,
                 hint=hint,
             )
         )
@@ -238,14 +244,14 @@ class TemplateAnalyzer:
         else:
             self._validate_single_type(type_annotation, decl, filename)
 
-    def _validate_single_type(self, type_annotation: Any, decl: VariableDeclaration, filename: str) -> None:
+    def _validate_single_type(self, type_annotation: TypeAnnotation, decl: VariableDeclaration, filename: str) -> None:
         """
         Validate a single type annotation
 
         Args:
-            type_annotation: The type annotation to validate
-            decl: The variable declaration
-            filename: The filename for error reporting
+            type_annotation (TypeAnnotation): The type annotation to validate
+            decl (VariableDeclaration): The variable declaration
+            filename (str): The filename for error reporting
         """
 
         if not self.resolver:
@@ -256,7 +262,28 @@ class TemplateAnalyzer:
         if type_name in PYTHON_BUILTINS or type_name in TYPING_TYPES:
             return
 
-        if not self.resolver.validate_type_exists(type_name):
+        base_type_name = type_name
+        if type_annotation.module:
+            base_type_name = type_name
+
+        if type_name in self.registry._imported_names:
+            return
+
+        conflicts = self.resolver.get_type_conflicts()
+        if type_name in conflicts and not type_annotation.module:
+            conflicting_types = conflicts[type_name]
+            qualified_names = [f"{rt.qualified_name}" for rt in conflicting_types]
+            self.add_issue(
+                severity="error",
+                message=f"Ambiguous type '{type_name}' found in multiple files",
+                filename=filename,
+                line=decl.line,
+                col=decl.col,
+                hint=f"Use qualified name: {', '.join(qualified_names)} or import explicitly with {{# typja:from <module> import {type_name} #}}",
+            )
+            return
+
+        if not self.resolver.validate_type_exists(base_type_name):
             self.add_issue(
                 severity="error",
                 message=f"Type '{type_name}' not found in configured paths",
@@ -269,6 +296,30 @@ class TemplateAnalyzer:
         if type_annotation.args:
             for arg in type_annotation.args:
                 self._validate_single_type(arg, decl, filename)
+
+    def _get_column_position(self, line_no: int, text: str) -> tuple[int, int | None]:
+        """
+        Get the column position of text in a specific line
+
+        Args:
+            line_no (int): Line number (1-based)
+            text (str): Text to find in the line
+
+        Returns:
+            tuple[int, int | None]: (start_col, end_col) or (0, None) if not found
+        """
+
+        if line_no <= 0 or line_no > len(self._content_lines):
+            return 0, None
+
+        line_content = self._content_lines[line_no - 1]
+        start_pos = line_content.find(text)
+
+        if start_pos == -1:
+            return 0, None
+
+        end_pos = start_pos + len(text)
+        return start_pos, end_pos
 
 
 class ValidationVisitor(NodeVisitor):
@@ -290,11 +341,14 @@ class ValidationVisitor(NodeVisitor):
                 return
 
             if var_name not in self.analyzer.variables:
+                col_start, col_end = self.analyzer._get_column_position(node.lineno, var_name)
                 self.analyzer.add_issue(
                     severity="warning",
                     message=f"Variable '{var_name}' is not declared",
                     filename=self.filename,
                     line=node.lineno,
+                    col=col_start,
+                    end_col=col_end,
                     hint=f"Add declaration: {{# typja:var {var_name}: <type> #}}",
                 )
 
@@ -322,9 +376,9 @@ class ValidationVisitor(NodeVisitor):
                     if node.kwargs:
                         actual_count += len(node.kwargs)
                     if node.dyn_args:
-                        actual_count = -1  # Can't validate with dynamic args
+                        actual_count = -1  # I can't validate with dynamic args for now, so I just skip it
                     if node.dyn_kwargs:
-                        actual_count = -1  # Can't validate with dynamic kwargs
+                        actual_count = -1  # I can't validate with dynamic kwargs for now, so I just skip it
 
                     if actual_count != -1 and actual_count != expected_count:
                         self.analyzer.add_issue(
@@ -341,39 +395,113 @@ class ValidationVisitor(NodeVisitor):
         if node.lineno in self.analyzer.ignored_lines:
             return
 
-        if isinstance(node.node, nodes.Name) and node.node.ctx == "load":
-            var_name = node.node.name
-            type_annotation: TypeAnnotation | None = None
+        base_type_annotation = self._resolve_node_type(node.node)
 
-            if var_name in self.analyzer.variables:
-                var_decl = self.analyzer.variables[var_name]
-                type_annotation = var_decl.type_annotation
-            elif var_name in self.loop_vars:
-                type_annotation = self.loop_vars[var_name]
+        if base_type_annotation and self.analyzer.resolver:
+            base_type_name = self._get_base_type_name(base_type_annotation)
 
-            if type_annotation:
-                base_type_name = self._get_base_type_name(type_annotation)
+            # Special handling for explicitly imported types - use the registry to get the correct type
+            if base_type_annotation.name in self.analyzer.registry._imported_names and not base_type_annotation.module:
+                imported_type_def = self.analyzer.registry._imported_names[base_type_annotation.name]
+                if imported_type_def and imported_type_def.module:
+                    base_type_name = f"{imported_type_def.module}.{base_type_annotation.name}"
 
-                if base_type_name and self.analyzer.resolver:
-                    is_valid, error_msg = self.analyzer.resolver.validate_attribute(base_type_name, node.attr)
+            if base_type_name:
+                is_valid, error_msg = self.analyzer.resolver.validate_attribute(base_type_name, node.attr)
 
-                    if not is_valid:
-                        self.analyzer.add_issue(
-                            severity="error",
-                            message=error_msg or "Invalid attribute access",
-                            filename=self.filename,
-                            line=node.lineno,
-                            hint=f"Check the definition of '{base_type_name}' for available attributes",
-                        )
+                if not is_valid:
+                    # Get column position for the attribute
+                    col_start, col_end = self.analyzer._get_column_position(node.lineno, node.attr)
+
+                    self.analyzer.add_issue(
+                        severity="error",
+                        message=f"Type '{base_type_name}' has no attribute '{node.attr}'",
+                        filename=self.filename,
+                        line=node.lineno,
+                        col=col_start,
+                        end_col=col_end,
+                        hint=f"Check the definition of '{base_type_name}' for available attributes",
+                    )
 
         self.generic_visit(node)
+
+    def _resolve_node_type(self, node: nodes.Node) -> TypeAnnotation | None:
+        """
+        Recursively resolve the type of a node (Name, Getattr, or Getitem)
+
+        Args:
+            node (nodes.Node): The AST node to resolve
+
+        Returns:
+            TypeAnnotation | None: The resolved type annotation or None
+        """
+
+        if isinstance(node, nodes.Name):
+            var_name = node.name
+
+            if var_name in self.analyzer.variables:
+                return self.analyzer.variables[var_name].type_annotation
+            elif var_name in self.loop_vars:
+                return self.loop_vars[var_name]
+
+            return None
+
+        elif isinstance(node, nodes.Getattr):
+            base_type = self._resolve_node_type(node.node)
+
+            if not base_type or not self.analyzer.resolver:
+                return None
+
+            base_type_name = self._get_base_type_name(base_type)
+            if not base_type_name:
+                return None
+
+            attr_type_str = self.analyzer.resolver.get_attribute_type(base_type_name, node.attr)
+
+            if attr_type_str:
+                try:
+                    from typja.parser.type import TypeParser
+
+                    type_parser = TypeParser()
+                    return type_parser.parse_type(attr_type_str, node.lineno, 0)
+                except Exception:
+                    return None
+
+            return None
+
+        elif isinstance(node, nodes.Getitem):
+            base_type = self._resolve_node_type(node.node)
+
+            if not base_type:
+                return None
+
+            if isinstance(node.arg, nodes.Const) and isinstance(node.arg.value, str):
+                if self.analyzer.resolver:
+                    base_type_name = self._get_base_type_name(base_type)
+                    if base_type_name:
+                        attr_type_str = self.analyzer.resolver.get_attribute_type(base_type_name, node.arg.value)
+                        if attr_type_str:
+                            try:
+                                from typja.parser.type import TypeParser
+
+                                type_parser = TypeParser()
+                                return type_parser.parse_type(attr_type_str, node.lineno, 0)
+                            except Exception:
+                                return None
+
+            if base_type.args and len(base_type.args) > 0:
+                return base_type.args[0]
+
+            return None
+
+        return None
 
     def _get_base_type_name(self, type_annotation: TypeAnnotation) -> str | None:
         """
         Extract the base type name from a type annotation
 
         Args:
-            type_annotation: The type annotation
+            type_annotation (TypeAnnotation): The type annotation
 
         Returns:
             str | None: The base type name or None
@@ -386,6 +514,10 @@ class ValidationVisitor(NodeVisitor):
             for union_type in type_annotation.union_types:
                 if union_type.name != "None":
                     return self._get_base_type_name(union_type)
+
+        # Handle qualified names - return the full qualified name
+        if type_annotation.module:
+            return f"{type_annotation.module}.{type_annotation.name}"
 
         return type_annotation.name
 
@@ -444,6 +576,34 @@ class ValidationVisitor(NodeVisitor):
             for child in node.else_:
                 self.visit(child)
 
+    def visit_Getitem(self, node: nodes.Getitem) -> None:
+        # skip checks for lines marked with `{# typja: ignore #}`
+        if node.lineno in self.analyzer.ignored_lines:
+            return
+
+        base_type = self._resolve_node_type(node.node)
+
+        if base_type and self.analyzer.resolver:
+            if isinstance(node.arg, nodes.Const) and isinstance(node.arg.value, str):
+                base_type_name = self._get_base_type_name(base_type)
+
+                if base_type_name:
+                    is_valid, error_msg = self.analyzer.resolver.validate_attribute(base_type_name, node.arg.value)
+
+                    if not is_valid:
+                        col_start, col_end = self.analyzer._get_column_position(node.lineno, node.arg.value)
+                        self.analyzer.add_issue(
+                            severity="error",
+                            message=error_msg or f"Type '{base_type_name}' has no attribute '{node.arg.value}'",
+                            filename=self.filename,
+                            line=node.lineno,
+                            col=col_start,
+                            end_col=col_end,
+                            hint=f"Dictionary-style access user['{node.arg.value}'] requires the attribute to exist",
+                        )
+
+        self.generic_visit(node)
+
     def visit_Call(self, node: nodes.Call) -> None:
         # skip checks for lines marked with `{# typja: ignore #}`
         if node.lineno in self.analyzer.ignored_lines:
@@ -464,7 +624,7 @@ class ValidationVisitor(NodeVisitor):
                 actual_keyword = len(node.kwargs) if node.kwargs else 0
                 actual_total = actual_positional + actual_keyword
 
-                # I can't validate with dynamic args/kwargs for now, so just skip it
+                # I can't validate with dynamic args and kwargs for now, so just skip it
                 if node.dyn_args or node.dyn_kwargs:
                     self.generic_visit(node)
                     return

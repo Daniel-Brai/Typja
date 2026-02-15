@@ -1,0 +1,10 @@
+{# This should cause a conflict error since User exists in both user.py and
+other_user.py #} {# typja:var current_user: User #} {# These should work fine
+with qualified names #} {# typja:var main_user: user.User #} {# typja:var
+alt_user: other_user.User #} {# Or explicitly import to resolve conflict #} {#
+typja:from user import User #} {# typja:var imported_user: User #}
+
+<h1>{{ current_user.name }}</h1>
+<p>Main User: {{ main_user.name }}</p>
+<p>Alt User: {{ alt_user.full_name }}</p>
+<p>Imported User: {{ imported_user.email }}</p>

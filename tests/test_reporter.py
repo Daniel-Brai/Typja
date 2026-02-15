@@ -1,6 +1,5 @@
 from io import StringIO
 
-import pytest
 
 from typja.analyzer import ValidationIssue
 from typja.config.schema import ErrorsConfig

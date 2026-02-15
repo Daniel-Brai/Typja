@@ -67,6 +67,7 @@ class TypeRegistry:
         self._imported_modules: set[str] = set()
         self._builtins = PYTHON_BUILTINS
         self._typing_types = TYPING_TYPES
+        self._type_conflicts: dict[str, list] = {}
 
     def register_type(self, type_def: TypeDefinition) -> None:
         self._types[type_def.name] = type_def
@@ -154,24 +155,41 @@ class TypeRegistry:
                 f"\nHint: {{# typja:from typing import {type_annotation.name} #}}"
             )
 
+        # Handle qualified names like 'user.User'
         if type_annotation.module:
+            # For qualified names, check if the module exists in _modules (file-based modules)
+            if type_annotation.module in self._modules:
+                module_types = self._modules[type_annotation.module]
+                if type_annotation.name in module_types:
+                    return module_types[type_annotation.name]
+                else:
+                    raise TypjaValidationError(
+                        f"Module '{type_annotation.module}' has no type '{type_annotation.name}'"
+                    )
+
+            # If module not found, check if it needs to be imported
             if type_annotation.module not in self._imported_modules:
                 raise TypjaValidationError(
                     f"Module '{type_annotation.module}' is not imported.\n"
                     f"\nHint: {{# typja:import {type_annotation.module} #}}"
                 )
 
-            if type_annotation.module not in self._modules:
-                raise TypjaValidationError(f"Module '{type_annotation.module}' not found")
-
-            module_types = self._modules[type_annotation.module]
-            if type_annotation.name not in module_types:
-                raise TypjaValidationError(f"Module '{type_annotation.module}' has no type '{type_annotation.name}'")
-
-            return module_types[type_annotation.name]
+            raise TypjaValidationError(f"Module '{type_annotation.module}' not found")
 
         if type_annotation.name in self._imported_names:
             return self._imported_names[type_annotation.name]
+
+        if type_annotation.name in self._type_conflicts:
+            conflicting_types = self._type_conflicts[type_annotation.name]
+
+            if isinstance(conflicting_types, list) and len(conflicting_types) > 0:
+                if hasattr(conflicting_types[0], "qualified_name"):
+                    qualified_names = [rt.qualified_name for rt in conflicting_types]
+                    raise TypjaValidationError(
+                        f"Ambiguous type '{type_annotation.name}' found in multiple files.\n"
+                        f"Use qualified name: {', '.join(qualified_names)}\n"
+                        f"Or import explicitly: {{# typja:from <module> import {type_annotation.name} #}}"
+                    )
 
         raise TypjaValidationError(
             f"'{type_annotation.name}' is not defined.\n"
@@ -191,3 +209,21 @@ class TypeRegistry:
         self._imported_names.clear()
         self._imported_modules.clear()
         self._imported_names.update(self._auto_imported_names)
+
+    def set_type_conflicts(self, conflicts: dict[str, list]) -> None:
+        """
+        Set the type conflicts detected by the resolver
+
+        Args:
+            conflicts (dict[str, list]): Mapping of type names to conflicting types
+        """
+        self._type_conflicts = conflicts
+
+    def get_type_conflicts(self) -> dict[str, list]:
+        """
+        Get the detected type conflicts
+
+        Returns:
+            dict[str, list]: Mapping of type names to conflicting types
+        """
+        return self._type_conflicts

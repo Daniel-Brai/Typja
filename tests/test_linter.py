@@ -24,8 +24,10 @@ class TestLinter:
         issues = linter.lint_template(template, "test.html", config)
 
         assert isinstance(issues, list)
+        assert len(issues) == 0
 
     def test_lint_old_style_union(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Union #}
@@ -134,11 +136,11 @@ class TestLinter:
 
         issues = linter.lint_template(template, "test.html", config)
 
-        # May warn about unsorted imports
-        # This depends on linter implementation
         assert isinstance(issues, list)
+        assert len(issues) == 0
 
     def test_lint_redundant_none(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Optional #}
@@ -152,10 +154,11 @@ class TestLinter:
 
         issues = linter.lint_template(template, "test.html", config)
 
-        # Linter should process the template
         assert isinstance(issues, list)
+        assert len(issues) > 0
 
     def test_lint_union_style_error(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Union #}
@@ -170,10 +173,11 @@ class TestLinter:
 
         issues = linter.lint_template(template, "test.html", config)
 
-        # Linter should process the template
         assert isinstance(issues, list)
+        assert len(issues) > 0
 
     def test_lint_union_style_ignore(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Union #}
@@ -229,8 +233,11 @@ class TestLinter:
 
         assert isinstance(issues1, list)
         assert isinstance(issues2, list)
+        assert len(issues1) == 0
+        assert len(issues2) == 0
 
     def test_lint_with_macro_declarations(self):
+
         linter = Linter()
         template = """
 {# typja:macro greet(name: str) -> str #}
@@ -244,8 +251,10 @@ class TestLinter:
         issues = linter.lint_template(template, "test.html", config)
 
         assert isinstance(issues, list)
+        assert len(issues) == 0
 
     def test_lint_with_filter_declarations(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Callable #}
@@ -285,6 +294,7 @@ class TestLinter:
         assert fixed == "str | int | list"
 
     def test_lint_check_pep604_union(self):
+
         linter = Linter()
         parser = CommentParser()
 
@@ -297,9 +307,11 @@ class TestLinter:
         )
         var_comment = [c for c in comments if c.kind == "var"][0]
         decl = var_comment.declarations[0]
+
         assert linter._check_pep604_union(decl.type_annotation) is False  # type: ignore
 
     def test_lint_check_unused_import(self):
+
         linter = Linter()
 
         content = """
@@ -313,6 +325,7 @@ class TestLinter:
         assert dict_result is False
 
     def test_lint_template_from_fixtures(self, valid_templates_dir):
+
         linter = Linter()
 
         simple_template = (valid_templates_dir / "simple_vars.html").read_text()
@@ -326,6 +339,7 @@ class TestLinter:
         issues = linter.lint_template(simple_template, "simple_vars.html", config)
 
         assert isinstance(issues, list)
+        assert len(issues) == 0
 
     def test_lint_union_type_fixture(self, valid_templates_dir):
         linter = Linter()
@@ -340,8 +354,10 @@ class TestLinter:
         issues = linter.lint_template(union_template, "union_types.html", config)
 
         assert isinstance(issues, list)
+        assert len(issues) == 0
 
     def test_lint_severity_levels(self):
+
         linter = Linter()
         template = """
 {# typja:from typing import Union #}

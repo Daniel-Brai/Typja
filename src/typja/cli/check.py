@@ -68,7 +68,7 @@ def check(
                 config_file = ConfigLoader.find_config(root_path)
             except TypjaConfigError as e:
                 console.print(
-                    f"[red]Error:[/red] No typja.toml found in {root_path} or parent directories.\n"
+                    f"[red]Error:[/red] No typja.toml found in {root_path} or parent directory.\n"
                     "[blue]Hint:[/blue] Run 'typja init' to create a configuration file or specify the project root with --root."
                 )
                 raise typer.Exit(1) from e
